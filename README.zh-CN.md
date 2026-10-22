@@ -76,3 +76,7 @@ npm test
 - [references/article-artifacts.md](references/article-artifacts.md)：写作项目的产物契约。
 - [docs/design.md](docs/design.md)：功能设计。
 - [docs/public-release-readiness.md](docs/public-release-readiness.md)：公开前待办；仓库目前不进行公开发布。
+
+## 许可证
+
+[MIT](LICENSE)。

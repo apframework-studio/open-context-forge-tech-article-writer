@@ -106,3 +106,7 @@ This Skill does not import web pages into a vault, compile long-term Wiki notes,
 - [Article artifacts](references/article-artifacts.md) — writing project contents.
 - [Design](docs/design.md) — current feature design.
 - [Public release readiness](docs/public-release-readiness.md) — decisions and checks to complete before changing repository visibility.
+
+## License
+
+[MIT](LICENSE).
