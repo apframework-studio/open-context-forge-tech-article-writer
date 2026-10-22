@@ -6,6 +6,14 @@
 
 它承接 Open Context Forge 的 `vault knowledge → writing project → reviewed article` 阶段。知识库摄入与编译由 Open Context Forge Vault Maintainer 负责；渠道发布由独立发布流程处理。设计参考 [LLM Wiki](https://github.com/nashsu/llm_wiki/blob/main/README_CN.md) 对 purpose、结构化 Wiki、检索和来源追溯的做法，当前仓库只实现知识库到文章的链路。
 
+## 使用条件
+
+- Agent 能读取本 Skill、访问选定的 vault，并写入文章工作区。
+- 运行两个可选辅助脚本需要 Node.js 20 或更新版本；脚本没有第三方运行时依赖。
+- 每次任务都要明确指定 vault。若提供网页链接，Agent 还需要具备读取网页正文的能力；脚本本身不会抓取网页。
+
+普通写作默认只读知识库。草稿、证据表和审稿记录保存在独立 writing project 中，不写入 vault。
+
 ## 使用
 
 让支持 Agent Skills 的智能体读取仓库根目录的 [SKILL.md](SKILL.md)，并在请求中指定 vault。若希望以后通过 Skill 名称调用，可将**整个仓库**链接到个人 Skill 目录，保留同目录的 `scripts/` 与 `references/`：
@@ -20,6 +28,18 @@ ln -s "/absolute/path/to/open-context-forge-tech-article-writer" "$HOME/.agents/
 > 使用 `$open-context-forge-tech-article-writer`，基于 `/absolute/path/to/my-vault` 中的知识与风格资料，写一篇关于 Agent 记忆的中文技术文章。我的判断是：可靠性更依赖可追溯的上下文组织，而不是更长的对话历史。写作项目放在 `/absolute/path/to/writing-projects`。
 
 用户给出明确立场时，Skill 会直接组织来源和大纲；立场会影响文章方向但仍缺失时，才会集中追问。完整文章默认在大纲确认后写正文。若明确说“直接成稿”，会记录跳过确认的原因并继续。只要大纲、改写或审稿也可从对应阶段开始。
+
+完整写作链路是：
+
+```text
+指定知识库 + 用户输入
+→ 检索与证据表
+→ 立场卡与写作 brief
+→ 供用户确认的大纲
+→ 草稿与风格修订
+→ 编辑审查
+→ article.md
+```
 
 默认输出目录是当前项目的 `workspace/writing-projects/<slug>/`；用户可以指定其他目录。完整项目通常包含 `notes/evidence-ledger.md`、`artifacts/stance-card.md`、`brief.md`、`outline.md`、`draft.md`、`review/editorial-review.md` 和 `article.md`。原始输入、检索记录与必要图片也保留在项目内。知识库默认只读。
 
