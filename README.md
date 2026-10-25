@@ -2,9 +2,9 @@
 
 Language: **English** · [简体中文](README.zh-CN.md)
 
-**Turn knowledge from a selected vault and your own viewpoint into an evidence-backed Chinese technical article.**
+**Turn knowledge from a selected vault into an evidence-backed Chinese technical article, with or without an author viewpoint.**
 
-Open Context Forge Tech Article Writer is a file-based Agent Skill for the **knowledge-to-article** stage of Open Context Forge. It guides an agent through source retrieval, viewpoint clarification, an argument-driven outline, drafting, style revision, and editorial review. Its output is an article you can inspect and revise, alongside the evidence and decisions used to write it.
+Open Context Forge Tech Article Writer is a file-based Agent Skill for the **knowledge-to-article** stage of Open Context Forge. It guides an agent through source retrieval, mode selection, an outline, drafting, style revision, visual checks, and editorial review. Its output is an article you can inspect and revise, alongside the evidence and decisions used to write it.
 
 The workflow builds on an existing Markdown knowledge vault. The broader Open Context Forge project covers source collection, knowledge compilation, writing, and publishing. This Skill handles writing only. Its emphasis on a structured Wiki, vault purpose, retrieval, and traceable sources is informed by [LLM Wiki](https://github.com/nashsu/llm_wiki/blob/main/README_CN.md).
 
@@ -36,6 +36,12 @@ Then ask:
 
 > Use `$open-context-forge-tech-article-writer` with `/absolute/path/to/my-vault` to prepare an outline for a Chinese technical article about agent memory. My main argument is that traceable context matters more than conversation length.
 
+For a neutral article, say so directly:
+
+> Use `$open-context-forge-tech-article-writer` with `/absolute/path/to/my-vault` to analyze Thin Orchestrator. Describe its mechanism and limits without taking an opinionated position.
+
+The Skill records `article_mode` as `analysis`, `opinion`, `tutorial`, `review`, or `case-study`. An explicit request to describe and analyze without a viewpoint selects `analysis`; source claims and outline hypotheses are not treated as your position. Feedback such as “the direction is right, but the article content is not” starts a full rewrite while preserving the earlier draft.
+
 Installation makes the Skill discoverable; it does not select a vault. You can also link it from one repository's `.agents/skills/` directory to limit where it appears.
 
 ## Writing workflow
@@ -45,14 +51,14 @@ For a full article, the agent follows this chain:
 ```text
 selected vault + your input
 → retrieval and evidence ledger
-→ stance card and writing brief
+→ mode-aware writing frame and brief
 → outline for your confirmation
 → draft and style revision
 → editorial review
 → article.md
 ```
 
-If your viewpoint is clear, the agent moves to retrieval and outlining without repeating questions. If a missing decision would change the article's direction, it asks a focused question. The default flow waits for your outline confirmation before writing the full draft. You can explicitly request a direct draft; the writing project records that the outline gate was skipped. Existing approved outlines and drafts can be resumed without restarting the process.
+If your request is clear, the agent moves to retrieval and outlining without repeating questions. It asks about a missing decision only when that would change the article's direction. The default flow waits for your outline confirmation before writing the full draft. You can explicitly request a direct draft; the writing project records that the outline gate was skipped. Existing approved outlines and drafts can be resumed without restarting the process.
 
 By default, each article goes under the current project's `workspace/writing-projects/<slug>/`. You may choose another project directory or a parent directory for several articles. A full project normally contains:
 
@@ -66,11 +72,16 @@ By default, each article goes under the current project's `workspace/writing-pro
   artifacts/brief.md
   artifacts/outline.md
   artifacts/draft.md
+  artifacts/diagram-spec.md  # when creating diagrams
+  assets/                   # when using images
+  review/render-check.md
   review/editorial-review.md
   article.md
 ```
 
-Optional images go in `assets/`. The evidence ledger distinguishes your stated viewpoint, earlier vault claims, source facts, inference, conflicting evidence, and unverified gaps. An existing project with `project.yaml` or `published.md` can be continued without forced migration.
+New diagrams are specified in `diagram-spec.md` and delivered as both SVG and PNG; the article normally embeds the PNG and keeps the SVG as an editable source. Screenshots and photos are not subject to that pair requirement. The evidence ledger separates `source-claim`, `analysis-hypothesis`, and confirmed `author-position`. An existing project with `project.yaml` or `published.md` can be continued without forced migration.
+
+The project tracks content, visual, render, and editorial status separately. “Article complete” means the text and required visuals are ready, the Markdown and images have been opened in the target renderer, and editorial review has passed. An outline-only or review-only request reports its own stage instead.
 
 ## Vault compatibility
 
@@ -95,7 +106,7 @@ node scripts/check-article.js \
 npm test
 ```
 
-`vault-query.js` returns matching Markdown candidates, not a generated answer or proof of a claim. `check-article.js` flags unfinished markers, potential local paths, and missing local images, returning a nonzero exit code when it finds an issue. Neither script replaces the agent's review of evidence, argument, and style.
+`vault-query.js` returns matching Markdown candidates, not a generated answer or proof of a claim. `check-article.js` flags unfinished markers, potential local paths, malformed or missing local image references, and basic PNG file damage, returning a nonzero exit code when it finds an issue. It checks common single-line Markdown images and HTML `<img>` tags, not the full Markdown specification or visual rendering; the agent must preview the article in its target renderer and record the result. Neither script replaces review of evidence, structure, and style.
 
 ## Scope and project files
 
@@ -104,7 +115,9 @@ This Skill does not import web pages into a vault, compile long-term Wiki notes,
 - [SKILL.md](SKILL.md) — operational workflow and boundaries.
 - [Knowledge and evidence guide](references/knowledge-and-evidence.md) — vault retrieval and source attribution.
 - [Article artifacts](references/article-artifacts.md) — writing project contents.
+- [Article modes](references/article-modes.md) — genre, claim ownership, and full rewrite behavior.
 - [Design](docs/design.md) — current feature design.
+- [Thin Orchestrator feedback](docs/thin-orchestrator-feedback.md) — adopted refinements and ideas being accumulated.
 - [Public release readiness](docs/public-release-readiness.md) — decisions and checks to complete before changing repository visibility.
 
 ## License

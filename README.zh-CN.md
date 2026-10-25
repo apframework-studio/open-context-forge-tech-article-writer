@@ -2,7 +2,7 @@
 
 语言：[English](README.md) · **简体中文**
 
-一个面向中文技术写作的 Agent Skill：从指定 Markdown 知识库读取已有判断、资料来源和风格线索，经过立场澄清、证据整理、大纲、写作与审稿，形成可审阅文章。
+一个面向中文技术写作的 Agent Skill：从指定 Markdown 知识库读取已有判断、资料来源和风格线索，按文章模式经过证据整理、大纲、写作、视觉验证与审稿，形成可审阅文章。分析稿不要求作者先表态。
 
 它承接 Open Context Forge 的 `vault knowledge → writing project → reviewed article` 阶段。知识库摄入与编译由 Open Context Forge Vault Maintainer 负责；渠道发布由独立发布流程处理。设计参考 [LLM Wiki](https://github.com/nashsu/llm_wiki/blob/main/README_CN.md) 对 purpose、结构化 Wiki、检索和来源追溯的做法，当前仓库只实现知识库到文章的链路。
 
@@ -27,21 +27,29 @@ ln -s "/absolute/path/to/open-context-forge-tech-article-writer" "$HOME/.agents/
 
 > 使用 `$open-context-forge-tech-article-writer`，基于 `/absolute/path/to/my-vault` 中的知识与风格资料，写一篇关于 Agent 记忆的中文技术文章。我的判断是：可靠性更依赖可追溯的上下文组织，而不是更长的对话历史。写作项目放在 `/absolute/path/to/writing-projects`。
 
-用户给出明确立场时，Skill 会直接组织来源和大纲；立场会影响文章方向但仍缺失时，才会集中追问。完整文章默认在大纲确认后写正文。若明确说“直接成稿”，会记录跳过确认的原因并继续。只要大纲、改写或审稿也可从对应阶段开始。
+中立分析也可以直接要求：
+
+> 使用 `$open-context-forge-tech-article-writer`，基于 `/absolute/path/to/my-vault` 陈述和分析 Thin Orchestrator 的机制与边界，不做观点倾向。
+
+`article_mode` 支持 `analysis`、`opinion`、`tutorial`、`review`、`case-study`。明确要求“陈述和分析，不做观点倾向”时使用 `analysis`；来源主张和大纲候选推论不会自动变成作者观点。“思路 ok，但文章内容不 ok”会触发全文重写并保存旧稿。
+
+请求方向明确时，Skill 会直接组织来源和大纲；缺失的信息会改变文章方向时，才会集中追问。完整文章默认在大纲确认后写正文。若明确说“直接成稿”，会记录跳过确认的原因并继续。只要大纲、改写或审稿也可从对应阶段开始。
 
 完整写作链路是：
 
 ```text
 指定知识库 + 用户输入
 → 检索与证据表
-→ 立场卡与写作 brief
+→ 与模式对应的写作框架卡与 brief
 → 供用户确认的大纲
 → 草稿与风格修订
 → 编辑审查
 → article.md
 ```
 
-默认输出目录是当前项目的 `workspace/writing-projects/<slug>/`；用户可以指定其他目录。完整项目通常包含 `notes/evidence-ledger.md`、`artifacts/stance-card.md`、`brief.md`、`outline.md`、`draft.md`、`review/editorial-review.md` 和 `article.md`。原始输入、检索记录与必要图片也保留在项目内。知识库默认只读。
+默认输出目录是当前项目的 `workspace/writing-projects/<slug>/`；用户可以指定其他目录。完整项目通常包含 `notes/evidence-ledger.md`、`artifacts/stance-card.md`、`brief.md`、`outline.md`、`draft.md`、`review/render-check.md`、`review/editorial-review.md` 和 `article.md`。新制作图示时增加 `artifacts/diagram-spec.md`、SVG 源文件和 PNG 成稿图，正文默认引用 PNG。原始输入、检索记录与必要图片也保留在项目内。知识库默认只读。
+
+项目分别记录正文、视觉、渲染和审稿状态。只有正文、必要图示与嵌入、目标渲染器预览、审稿全部完成，才报告“完整文章完成”；阶段任务只报告对应阶段。
 
 ## 知识库兼容
 
@@ -63,7 +71,7 @@ node scripts/check-article.js --file /absolute/path/to/project/article.md --json
 npm test
 ```
 
-检索脚本只给候选路径，不判断笔记是否真的支持文章观点。成稿检查可发现未完成标记、常见本机路径和缺失的本地图片；证据、论证、风格仍需按 Skill 审查。`check-article.js` 有阻断项时返回非零退出码。
+检索脚本只给候选路径，不判断笔记是否真的支持文章判断。成稿检查覆盖常见单行 Markdown 图片和 HTML `<img>`，可发现未完成标记、常见本机路径、异常图片引用和基础 PNG 损坏；它不是完整 Markdown 解析器，也无法证明目标渠道实际渲染正确，仍需打开成稿检查并记录。证据、结构、风格也需按 Skill 审查。`check-article.js` 有阻断项时返回非零退出码。
 
 ## 范围
 
@@ -74,7 +82,9 @@ npm test
 - [SKILL.md](SKILL.md)：写作入口、工作流和交付边界。
 - [references/knowledge-and-evidence.md](references/knowledge-and-evidence.md)：知识库检索与证据整理。
 - [references/article-artifacts.md](references/article-artifacts.md)：写作项目的产物契约。
+- [references/article-modes.md](references/article-modes.md)：文章模式、判断归属与全文重写。
 - [docs/design.md](docs/design.md)：功能设计。
+- [docs/thin-orchestrator-feedback.md](docs/thin-orchestrator-feedback.md)：本次反馈的采纳与待积累项。
 - [docs/public-release-readiness.md](docs/public-release-readiness.md)：公开前待办；仓库目前不进行公开发布。
 
 ## 许可证
