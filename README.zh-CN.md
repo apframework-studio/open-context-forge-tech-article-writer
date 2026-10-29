@@ -9,7 +9,7 @@
 ## 使用条件
 
 - Agent 能读取本 Skill、访问选定的 vault，并写入文章工作区。
-- 运行两个可选辅助脚本需要 Node.js 20 或更新版本；脚本没有第三方运行时依赖。
+- 运行辅助脚本需要 Node.js 20 或更新版本；脚本没有第三方运行时依赖。
 - 每次任务都要明确指定 vault。若提供网页链接，Agent 还需要具备读取网页正文的能力；脚本本身不会抓取网页。
 
 普通写作默认只读知识库。草稿、证据表和审稿记录保存在独立 writing project 中，不写入 vault。
@@ -31,7 +31,7 @@ ln -s "/absolute/path/to/open-context-forge-tech-article-writer" "$HOME/.agents/
 
 > 使用 `$open-context-forge-tech-article-writer`，基于 `/absolute/path/to/my-vault` 陈述和分析 Thin Orchestrator 的机制与边界，不做观点倾向。
 
-`article_mode` 支持 `analysis`、`opinion`、`tutorial`、`review`、`case-study`。明确要求“陈述和分析，不做观点倾向”时使用 `analysis`；来源主张和大纲候选推论不会自动变成作者观点。“思路 ok，但文章内容不 ok”会触发全文重写并保存旧稿。
+`article_mode` 支持 `analysis`、`opinion`、`tutorial`、`review`、`case-study`。明确要求“陈述和分析，不做观点倾向”时使用 `analysis`；来源主张和大纲候选推论不会自动变成作者观点。“思路 ok，但文章内容不 ok”通常触发全文重写并保存旧稿；若同时明确限制“小幅修改”，则遵守该范围。`output_intent` 区分内部笔记、可审阅稿、公开稿与渠道交接；`edit_scope` 区分只读、校对、局部、结构调整和全文重写。
 
 请求方向明确时，Skill 会直接组织来源和大纲；缺失的信息会改变文章方向时，才会集中追问。完整文章默认在大纲确认后写正文。若明确说“直接成稿”，会记录跳过确认的原因并继续。只要大纲、改写或审稿也可从对应阶段开始。
 
@@ -40,16 +40,17 @@ ln -s "/absolute/path/to/open-context-forge-tech-article-writer" "$HOME/.agents/
 ```text
 指定知识库 + 用户输入
 → 检索与证据表
+→ 关键判断清单与有限验证记录
 → 与模式对应的写作框架卡与 brief
 → 供用户确认的大纲
 → 草稿与风格修订
-→ 编辑审查
+→ 公开来源映射、编辑与渲染审查
 → article.md
 ```
 
-默认输出目录是当前项目的 `workspace/writing-projects/<slug>/`；用户可以指定其他目录。完整项目通常包含 `notes/evidence-ledger.md`、`artifacts/stance-card.md`、`brief.md`、`outline.md`、`draft.md`、`review/render-check.md`、`review/editorial-review.md` 和 `article.md`。新制作图示时增加 `artifacts/diagram-spec.md`、SVG 源文件和 PNG 成稿图，正文默认引用 PNG。原始输入、检索记录与必要图片也保留在项目内。知识库默认只读。
+默认输出目录是当前项目的 `workspace/writing-projects/<slug>/`；用户可以指定其他目录。完整项目通常包含 `notes/evidence-ledger.md`、`notes/claim-register.md`、必要时的验证日志与公开来源映射、写作框架、大纲、草稿、渲染和审稿记录及 `article.md`。新制作图示时增加 `artifacts/diagram-spec.md`、可编辑源文件和目标渲染器支持的成稿图；交给 Publisher 时增加 `artifacts/publisher-handoff.md`。知识库默认只读。
 
-项目分别记录正文、视觉、渲染和审稿状态。只有正文、必要图示与嵌入、目标渲染器预览、审稿全部完成，才报告“完整文章完成”；阶段任务只报告对应阶段。
+项目分别记录正文、证据、公开来源、视觉、渲染和审稿状态。只有正文、证据、必要图示与嵌入、目标渲染器预览、审稿全部完成，才报告“完整文章完成”；公开来源也完成才称“公开就绪”。渠道构建和上线仍由 Publisher 独立验证。
 
 ## 知识库兼容
 
@@ -67,11 +68,12 @@ ln -s "/absolute/path/to/open-context-forge-tech-article-writer" "$HOME/.agents/
 ```bash
 node scripts/vault-query.js --vault /absolute/path/to/vault --query "Agent 记忆" --json
 node scripts/vault-query.js --vault /absolute/path/to/vault --query "Agent 记忆" --include-sources --json
-node scripts/check-article.js --file /absolute/path/to/project/article.md --json
+node scripts/check-article.js --file /absolute/path/to/project/article.md --intent public_article --project /absolute/path/to/project --json
+node scripts/project-state.js --project /absolute/path/to/project --change body
 npm test
 ```
 
-检索脚本只给候选路径，不判断笔记是否真的支持文章判断。成稿检查覆盖常见单行 Markdown 图片和 HTML `<img>`，可发现未完成标记、常见本机路径、异常图片引用和基础 PNG 损坏；它不是完整 Markdown 解析器，也无法证明目标渠道实际渲染正确，仍需打开成稿检查并记录。证据、结构、风格也需按 Skill 审查。`check-article.js` 有阻断项时返回非零退出码。
+检索脚本只给候选路径，不判断笔记是否真的支持文章判断。成稿检查覆盖常见单行 Markdown 图片和 HTML `<img>`，可发现未完成标记、内部路径、未解析 wikilink、裸尖括号 URL、异常图片引用、基础 PNG 损坏和旧版审稿/渲染 hash；P0 阻断项返回非零退出码。状态脚本在产物改变后回退受影响的检查状态。两者不能判断事实真假或代替目标渠道的实际渲染，仍需打开成稿检查并记录。
 
 ## 范围
 
@@ -83,9 +85,12 @@ npm test
 - [references/knowledge-and-evidence.md](references/knowledge-and-evidence.md)：知识库检索与证据整理。
 - [references/article-artifacts.md](references/article-artifacts.md)：写作项目的产物契约。
 - [references/article-modes.md](references/article-modes.md)：文章模式、判断归属与全文重写。
+- [references/task-and-state.md](references/task-and-state.md)：任务意图、修改权限与状态回退。
+- [references/claims-and-public-sources.md](references/claims-and-public-sources.md)：关键判断、验证与公开来源。
+- [docs/graphify-scope.md](docs/graphify-scope.md)：Graphify 反馈的本轮采纳范围。
 - [docs/design.md](docs/design.md)：功能设计。
 - [docs/thin-orchestrator-feedback.md](docs/thin-orchestrator-feedback.md)：本次反馈的采纳与待积累项。
-- [docs/public-release-readiness.md](docs/public-release-readiness.md)：公开前待办；仓库目前不进行公开发布。
+- [docs/public-release-readiness.md](docs/public-release-readiness.md)：公开前检查记录。
 
 ## 许可证
 

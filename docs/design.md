@@ -13,22 +13,23 @@
 
 ## 工作流
 
-1. 建立 writing project：保存用户原始输入、vault 路径、`article_mode` 与四种独立状态。知识库默认只读，过程稿存放在用户指定的工作区；若未指定，使用当前项目的 `workspace/writing-projects/<slug>/`。
+1. 建立 writing project：保存用户原始输入、vault 路径、`article_mode`、`output_intent`、`edit_scope` 与独立状态。知识库默认只读，过程稿存放在用户指定的工作区；若未指定，使用当前项目的 `workspace/writing-projects/<slug>/`。
 2. 理解输入并检索：先检索 Wiki 判断、概念、框架、来源摘要和反例，再回溯 raw；读取少量相关历史文章和 style note。候选检索只是召回，需阅读原文核对。
-3. 建立证据表：每项关键事实或判断记录来源定位、支持关系、冲突、时效和核对状态；分开标记 `source-claim`、`analysis-hypothesis`、`author-position`。
+3. 建立证据表与关键判断清单：记录来源定位、支持关系、冲突、时效、验证范围和核对状态；分开标记 `source-claim`、`observed-result`、`analysis-hypothesis`、`author-position`。公开稿另建立公开来源映射。
 4. 选择 `analysis`、`opinion`、`tutorial`、`review` 或 `case-study`。用户明确要求中立陈述分析时使用 `analysis`，不强迫澄清作者立场。缺少会改变文章方向的信息时集中追问，完成模式对应的 stance card、brief 和 outline。
 5. 大纲门：默认等用户确认后写完整正文。用户明确要求直接成稿时可越过该门，记录跳过原因及未确认风险。
-6. 写初稿、选用必要图表、按 style notes 修订并审稿。新制作的图示先有章节与证据对应的 `diagram-spec.md`，交付 SVG/PNG，正文默认引用 PNG；截图和照片不受双格式约束。
-7. 脚本检查图片引用与基础文件结构，随后在目标 Markdown 渲染器实际预览，记录结果。只有正文、视觉、渲染、编辑审查四种状态均满足完成条件才报告完整文章完成。只在用户明确要求时交给知识库维护或发布流程，不自动改写 vault、提交 Git 或推送。
+6. 写初稿、选用必要图表、按 style notes 修订并审稿。新制作的图示先有章节与证据对应的 `diagram-spec.md`，保留可编辑源文件，交付目标渲染器支持的格式。
+7. 脚本检查图片引用、公开路径与基础文件结构，随后在目标 Markdown 渲染器实际预览，记录结果。只有正文、证据、视觉、渲染、编辑审查状态均满足完成条件才报告完整文章完成；公开来源映射完成后才报告公开就绪。只在用户明确要求时交给知识库维护或发布流程，不自动改写 vault、提交 Git 或推送。
 
 ## 产物契约
 
-写作项目保留 `project.md`、`input/`、`notes/evidence-ledger.md`、`artifacts/stance-card.md`、`brief.md`、`outline.md`、`draft.md`、`review/render-check.md`、`review/editorial-review.md`、`article.md` 与可选 `assets/`。制作图示时增加 `artifacts/diagram-spec.md`；全文重写时旧稿放入 `artifacts/revisions/`。短任务可合并 stance 与 brief。现有旧项目的 `published.md` 可作为成稿输入或兼容输出，不强行迁移。
+写作项目保留 `project.md`、`input/`、`notes/evidence-ledger.md`、`notes/claim-register.md`、必要时的 `notes/verification-log.md` 与 `notes/public-source-map.md`、`artifacts/stance-card.md`、`brief.md`、`outline.md`、`draft.md`、`review/render-check.md`、`review/editorial-review.md`、`article.md` 与可选 `assets/`。制作图示时增加 `artifacts/diagram-spec.md`；交给 Publisher 时增加 `artifacts/publisher-handoff.md`；全文重写时旧稿放入 `artifacts/revisions/`。短任务可合并 stance 与 brief。现有旧项目的 `published.md` 可作为成稿输入或兼容输出，不强行迁移。
 
 ## 可执行辅助
 
 - `scripts/vault-query.js`：无第三方依赖，只读识别两种 vault 布局并召回 Markdown 候选；输出相对路径、标题、分数和命中信号，不自动生成事实。
-- `scripts/check-article.js`：对成稿做机械检查，发现 TODO/TBD、本机绝对路径、异常的 Markdown/HTML 图片引用、缺失图片和基础 PNG 文件损坏。实际渲染、证据、结构、风格和授权仍需人工或 Agent 审查。
+- `scripts/check-article.js`：对成稿做机械检查，发现 TODO/TBD、本机绝对路径、内部引用、异常的 Markdown/HTML 图片引用、缺失图片、基础 PNG 文件损坏及过期审稿/渲染 hash。实际渲染、证据、结构、风格和授权仍需人工或 Agent 审查。
+- `scripts/project-state.js`：在产物变化后回退相关状态，在审稿或预览通过后记录当前文章 hash，并推导公开就绪状态。
 
 ## 验证场景
 
@@ -37,4 +38,4 @@
 - 来源冲突和未核实数字不会直接进入确定性正文。
 - 未批准大纲时停止在 outline；明确直写时记录例外。
 - 审稿清楚报告 P0/P1/P2，成稿没有过程占位符与本地路径。
-- “思路 ok，内容不 ok”会保留旧稿并重写正文；图示有章节规格和 SVG/PNG；完整文章只有实际预览后才报告完成。
+- “思路 ok，内容不 ok”通常保留旧稿并重写正文；用户明确要求小幅修改时遵守修改范围。图示有章节规格及目标格式；完整文章只有实际预览后才报告完成。

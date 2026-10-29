@@ -13,7 +13,7 @@ The operational [SKILL.md](SKILL.md) and its detailed references are currently w
 ## What you need
 
 - An agent that can read this Skill, access the selected vault, and write to a chosen article workspace.
-- Node.js 20 or newer for the two optional helper scripts. They have no third-party runtime dependencies.
+- Node.js 20 or newer for the helper scripts. They have no third-party runtime dependencies.
 - A **specific vault path** for each task. If you provide source URLs, the agent also needs a way to read those pages; the scripts do not fetch web content.
 
 The vault is read-only during ordinary writing. Article drafts and review notes belong in a separate writing project. The Skill does not choose a vault from recent history or from the location where it was installed.
@@ -40,7 +40,9 @@ For a neutral article, say so directly:
 
 > Use `$open-context-forge-tech-article-writer` with `/absolute/path/to/my-vault` to analyze Thin Orchestrator. Describe its mechanism and limits without taking an opinionated position.
 
-The Skill records `article_mode` as `analysis`, `opinion`, `tutorial`, `review`, or `case-study`. An explicit request to describe and analyze without a viewpoint selects `analysis`; source claims and outline hypotheses are not treated as your position. Feedback such as “the direction is right, but the article content is not” starts a full rewrite while preserving the earlier draft.
+The Skill records `article_mode` as `analysis`, `opinion`, `tutorial`, `review`, or `case-study`. An explicit request to describe and analyze without a viewpoint selects `analysis`; source claims and outline hypotheses are not treated as your position. Feedback such as “the direction is right, but the article content is not” normally starts a full rewrite while preserving the earlier draft. An explicit limit such as “only make small edits” takes precedence.
+
+It also records `output_intent` (`internal_note`, `reviewable_article`, `public_article`, or `channel_publish`) and `edit_scope` (`read-only`, `copyedit`, `local`, `structural`, or `full-rewrite`). “Do not edit” locks all project writes. Confirmed choices are reused instead of requested again.
 
 Installation makes the Skill discoverable; it does not select a vault. You can also link it from one repository's `.agents/skills/` directory to limit where it appears.
 
@@ -51,10 +53,11 @@ For a full article, the agent follows this chain:
 ```text
 selected vault + your input
 → retrieval and evidence ledger
+→ critical claim register and scoped verification log
 → mode-aware writing frame and brief
 → outline for your confirmation
 → draft and style revision
-→ editorial review
+→ public source mapping, editorial and renderer review
 → article.md
 ```
 
@@ -67,21 +70,25 @@ By default, each article goes under the current project's `workspace/writing-pro
   project.md
   input/
   notes/evidence-ledger.md
+  notes/claim-register.md
+  notes/verification-log.md # when running checks
+  notes/public-source-map.md # for reviewable or public articles
   notes/retrieval.md
   artifacts/stance-card.md
   artifacts/brief.md
   artifacts/outline.md
   artifacts/draft.md
   artifacts/diagram-spec.md  # when creating diagrams
+  artifacts/publisher-handoff.md # when handing off to Publisher
   assets/                   # when using images
   review/render-check.md
   review/editorial-review.md
   article.md
 ```
 
-New diagrams are specified in `diagram-spec.md` and delivered as both SVG and PNG; the article normally embeds the PNG and keeps the SVG as an editable source. Screenshots and photos are not subject to that pair requirement. The evidence ledger separates `source-claim`, `analysis-hypothesis`, and confirmed `author-position`. An existing project with `project.yaml` or `published.md` can be continued without forced migration.
+New diagrams are specified in `diagram-spec.md`, retain an editable source, and use a final format supported by the target renderer. The diagram record distinguishes conceptual diagrams, implementation diagrams, runtime screenshots, and measurement charts. The evidence ledger separates source claims, observed results, analysis hypotheses, and confirmed author positions. An existing project with `project.yaml` or `published.md` can be continued without forced migration.
 
-The project tracks content, visual, render, and editorial status separately. “Article complete” means the text and required visuals are ready, the Markdown and images have been opened in the target renderer, and editorial review has passed. An outline-only or review-only request reports its own stage instead.
+The project tracks content, evidence, public sources, visual, render, and editorial status separately. “Article complete” means the text, evidence, and required visuals are ready, the Markdown and images have been opened in the target renderer, and editorial review has passed. “Public ready” also requires a public reference map. A writing project does not claim that the destination blog has built or gone live; Publisher reports those stages separately.
 
 ## Vault compatibility
 
@@ -102,11 +109,13 @@ node scripts/vault-query.js --vault /absolute/path/to/vault \
 node scripts/vault-query.js --vault /absolute/path/to/vault \
   --query "agent memory" --include-sources --json
 node scripts/check-article.js \
-  --file /absolute/path/to/writing-project/article.md --json
+  --file /absolute/path/to/writing-project/article.md \
+  --intent public_article --project /absolute/path/to/writing-project --json
+node scripts/project-state.js --project /absolute/path/to/writing-project --change body
 npm test
 ```
 
-`vault-query.js` returns matching Markdown candidates, not a generated answer or proof of a claim. `check-article.js` flags unfinished markers, potential local paths, malformed or missing local image references, and basic PNG file damage, returning a nonzero exit code when it finds an issue. It checks common single-line Markdown images and HTML `<img>` tags, not the full Markdown specification or visual rendering; the agent must preview the article in its target renderer and record the result. Neither script replaces review of evidence, structure, and style.
+`vault-query.js` returns matching Markdown candidates, not a generated answer or proof of a claim. `check-article.js` flags unfinished markers, internal paths, unresolved wikilinks, MDX-sensitive angle URLs, image references, basic PNG damage, and stale review/render hashes. It reports P0/P1/P2/INFO counts and exits nonzero on P0. `project-state.js` updates state after a change and invalidates affected approvals; setting a review or render pass records the current article hash. These checks do not parse all Markdown, assess claim truth, or prove visual rendering. The agent must preview the article in its target renderer and review evidence and style.
 
 ## Scope and project files
 
@@ -116,7 +125,10 @@ This Skill does not import web pages into a vault, compile long-term Wiki notes,
 - [Knowledge and evidence guide](references/knowledge-and-evidence.md) — vault retrieval and source attribution.
 - [Article artifacts](references/article-artifacts.md) — writing project contents.
 - [Article modes](references/article-modes.md) — genre, claim ownership, and full rewrite behavior.
+- [Task and state contract](references/task-and-state.md) — output intent, edit scope, state transitions, and publication boundary.
+- [Claims and public sources](references/claims-and-public-sources.md) — claim register, verification log, and public source map.
 - [Design](docs/design.md) — current feature design.
+- [Graphify feedback scope](docs/graphify-scope.md) — adopted changes and deferred responsibilities.
 - [Thin Orchestrator feedback](docs/thin-orchestrator-feedback.md) — adopted refinements and ideas being accumulated.
 - [Public release readiness](docs/public-release-readiness.md) — decisions and checks to complete before changing repository visibility.
 

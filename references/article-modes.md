@@ -22,4 +22,6 @@
 
 ## 反馈触发的重写
 
-用户说“思路 ok，但文章内容不 ok”“方向对了，正文重写”或同义反馈时，进入 `full-rewrite`：保留已认可的研究问题和大纲约束，先把现有 `draft.md`、`article.md` 存入 `artifacts/revisions/`，记录具体不满意点，然后重新选择材料、案例、章节推进和表达方式，产出新的 `draft.md`。将 `content_status` 设为 `rewrite-needed`、`render_status` 设为 `not-run`、`editorial_status` 设为 `needs-revision`；涉及图示改动时同步重开 `visual_status`。不要把局部换词、扩句或润色称为重写。新稿重新经过证据、视觉、渲染与编辑审查；若反馈否定了大纲本身，则先修订大纲。
+用户说“思路 ok，但文章内容不 ok”“方向对了，正文重写”或同义反馈时，通常进入 `full-rewrite`：保留已认可的研究问题和大纲约束，先把现有 `draft.md`、`article.md` 存入 `artifacts/revisions/`，记录具体不满意点，然后重新选择材料、案例、章节推进和表达方式，产出新的 `draft.md`。将 `content_status` 设为 `rewrite-needed`、`render_status` 设为 `not-run`、`editorial_status` 设为 `needs-revision`；涉及图示改动时同步重开 `visual_status`。不要把局部换词、扩句或润色称为重写。新稿重新经过证据、视觉、渲染与编辑审查；若反馈否定了大纲本身，则先修订大纲。
+
+若用户同时明确限制“适当修改、不要大幅修复”“只改这一段”或“不修改”，以其当次 `edit_scope` 为准。局部修订不归档并重写全文；无法在授权范围内解决的结构问题，具体报告并保留原稿。修改权限与状态回退见 [任务意图与状态](task-and-state.md)。

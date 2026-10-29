@@ -1,5 +1,7 @@
 # Thin Orchestrator 写作反馈与升级决定
 
+以下是当时的采纳记录。图像格式与状态字段后来根据 Graphify 实际流程调整，当前执行规则以 [任务与状态契约](../references/task-and-state.md)、[产物契约](../references/article-artifacts.md) 为准。
+
 这份记录来自一次文章任务后的人工调整与其他 Agent 反馈。它用于约束本次 Skill 升级，并保留暂不固化的建议；单次案例不自动变成所有文章的硬规则。
 
 | 建议 | 决定 | 理由与实施边界 |

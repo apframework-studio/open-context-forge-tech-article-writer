@@ -71,7 +71,7 @@
 
 不要为了好看而画图。每张图都要回答一个论证问题。
 
-草稿阶段可用 Mermaid、文字图或表格表达。新制作的正式图示先写 `artifacts/diagram-spec.md`，再在 `assets/` 保存 SVG 源文件与 PNG；成稿默认用相对路径引用 PNG。实际在目标 Markdown 渲染器打开成稿检查图片和图说，结果记入 `review/render-check.md`。截图、照片或外部图片不套用图示的双格式要求。
+草稿阶段可用 Mermaid、文字图或表格表达。新制作的正式图示先写 `artifacts/diagram-spec.md`，再在 `assets/` 保存可编辑源文件和目标渲染器支持的成稿格式；正文使用相对路径。若目标渠道需要 PNG，导出并检查像素尺寸和文字可读性。实际在目标 Markdown 渲染器打开成稿检查图片和图说，结果记入 `review/render-check.md`。截图、照片或外部图片按原始格式、来源许可与渠道要求处理。
 
 ## 中文技术文章的人工审稿信号
 

@@ -9,7 +9,9 @@
 - 文章偏离本次模式目标；`opinion` 没有已确认的核心立场，或 `analysis` 被写成用户未要求的观点文。
 - 大纲和正文不一致。
 - 关键事实没有来源，且被写成确定性判断。
-- 图片路径错误、图片缺失或不可实际渲染；本机绝对路径或 vault 内部过程文本泄露到正式稿。
+- 图片路径错误、图片缺失或不可实际渲染；本机绝对路径、未解析 wikilink、vault 内部过程文本或 source fingerprint 泄露到正式稿。
+- 将局部源码验证、独立 extract、单次 token 结果写成全项目 benchmark、真实增量性能或普遍 Agent 效果。
+- 公开稿的关键来源未完成公开映射，或直接引用没有原文措辞、引号和来源。
 - 将过程草稿、临时 brief 或 review note 写入 vault，污染知识库空间。
 - 存在 `TODO`、`TBD`、未完成段落。
 - 文章只是功能清单，没有与模式相符的解释、操作、评估或论证主线。
@@ -46,10 +48,10 @@
 | 结构 | 每一节是否推进当前模式的解释、操作、评估或论证？ |
 | 风格 | 是否符合本次模式、受众与用户要求，并有结构化的深度解释？ |
 | 边界 | 是否说明适用和不适用场景？ |
-| 视觉 | 必要图示是否对应 `diagram-spec.md`、交付 SVG/PNG，并服务章节解释？ |
+| 视觉 | 必要图示是否对应 `diagram-spec.md`、交付目标格式及可编辑源文件，并服务章节解释？图注是否说明示意或实测？ |
 | 渲染 | Markdown、图片、图说是否在目标渲染器实际显示，结果是否记入 `render-check.md`？ |
 | AI 味 | 是否有无依据的观点、套话过渡、抽象词堆叠或缺乏具体支撑？指出句段，不用固定分数。 |
-| 发布 | 是否无 TODO、本地路径、内部 metadata？ |
+| 公开交接 | 是否无 TODO、本地路径、裸尖括号 URL 和内部 metadata？公开来源、图片署名、Publisher 交接是否齐全？ |
 
 ## Review Report
 
@@ -79,7 +81,10 @@ article-ready | needs-revision | blocked
 ### Delivery Status
 
 - content_status: ready | other
+- evidence_status: ready | other
+- public_source_status: ready | other
 - visual_status: ready | not-needed | other
 - render_status: passed | other
 - editorial_status: passed | other
+- public_readiness_status: public-ready | other
 ```

@@ -144,3 +144,76 @@ test('does not treat fenced image examples as embedded article images', (t) => {
   fs.writeFileSync(article, '# 示例\n```html\n<img src="assets/example.png">\n![示例](assets/example.png)\n```\n正文。\n');
   assert.deepEqual(checkArticle({ file: article }).issues, []);
 });
+
+test('public intent catches internal references and unresolved public syntax outside code', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ocf-writer-article-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const article = path.join(root, 'article.md');
+  fs.writeFileSync(article, '# 标题\n见 [[Graphify]] 与 20-wiki/graphify.md，详见 <https://example.org/guide>。\n```md\n[[example]]\n20-wiki/example.md\n<https://example.org/code>\n```\n');
+  const report = checkArticle({ file: article, intent: 'reviewable_article' });
+  assert.deepEqual(new Set(report.issues.map((issue) => issue.code)), new Set(['unresolved-wikilink', 'internal-reference', 'bare-angle-url']));
+  assert.ok(report.issues.every((issue) => issue.severity === 'P0'));
+  assert.equal(report.counts.P0, 3);
+});
+
+test('internal note permits internal paths and wikilinks', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ocf-writer-article-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const article = path.join(root, 'note.md');
+  fs.writeFileSync(article, '# 内部记录\n[[Graphify]]\n/Users/alice/vault/20-wiki/example.md\n');
+  assert.equal(checkArticle({ file: article, intent: 'internal_note' }).ok, true);
+});
+
+test('project check detects stale render and editorial proof', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ocf-writer-article-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const article = path.join(root, 'article.md');
+  fs.writeFileSync(article, '# 标题\n正文。\n');
+  fs.writeFileSync(path.join(root, 'project.md'), '---\ncontent_status: ready\nevidence_status: ready\npublic_source_status: ready\nvisual_status: not-needed\nrender_status: passed\neditorial_status: passed\nrendered_article_sha256: old\nreviewed_article_sha256: old\npublic_readiness_status: public-ready\n---\n');
+  const report = checkArticle({ file: article, intent: 'public_article', project: root });
+  assert.deepEqual(report.issues.filter((issue) => issue.code === 'stale-check').length, 2);
+  assert.equal(report.ok, false);
+});
+
+test('public project requires public source readiness', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ocf-writer-article-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const article = path.join(root, 'article.md');
+  fs.writeFileSync(article, '# 标题\n正文。\n');
+  fs.writeFileSync(path.join(root, 'project.md'), '---\ncontent_status: ready\nevidence_status: ready\npublic_source_status: needs-review\nvisual_status: not-needed\nrender_status: not-run\neditorial_status: needs-revision\npublic_readiness_status: public-ready\n---\n');
+  const report = checkArticle({ file: article, intent: 'public_article', project: root });
+  assert.ok(report.issues.some((issue) => issue.code === 'public-source-not-ready'));
+  assert.ok(report.issues.some((issue) => issue.code === 'readiness-mismatch'));
+});
+
+test('public image without alt is P1 and does not block mechanical P0 result', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ocf-writer-article-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(root, 'image.png'), ONE_PIXEL_PNG);
+  const article = path.join(root, 'article.md');
+  fs.writeFileSync(article, '# 标题\n![](image.png)\n');
+  const report = checkArticle({ file: article, intent: 'reviewable_article' });
+  assert.equal(report.ok, true);
+  assert.ok(report.issues.some((issue) => issue.code === 'missing-image-alt' && issue.severity === 'P1'));
+});
+
+test('public readiness check requires project state', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ocf-writer-article-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const article = path.join(root, 'article.md');
+  fs.writeFileSync(article, '# 标题\n正文。\n');
+  const report = checkArticle({ file: article, intent: 'public_article' });
+  assert.ok(report.issues.some((issue) => issue.code === 'missing-project-state' && issue.severity === 'P0'));
+  assert.equal(report.ok, false);
+});
+
+test('a passed state requires review records for the current project', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ocf-writer-article-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const article = path.join(root, 'article.md');
+  fs.writeFileSync(article, '# 标题\n正文。\n');
+  const digest = require('node:crypto').createHash('sha256').update(fs.readFileSync(article)).digest('hex');
+  fs.writeFileSync(path.join(root, 'project.md'), `---\ncontent_status: ready\nevidence_status: ready\npublic_source_status: not-run\nvisual_status: not-needed\nrender_status: passed\neditorial_status: passed\nrendered_article_sha256: ${digest}\nreviewed_article_sha256: ${digest}\npublic_readiness_status: article-ready\n---\n`);
+  const report = checkArticle({ file: article, intent: 'reviewable_article', project: root });
+  assert.equal(report.issues.filter((issue) => issue.code === 'missing-review-record').length, 2);
+});

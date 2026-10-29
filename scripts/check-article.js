@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { readProjectState, deriveReadiness, articleDigest } = require('./project-state');
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
@@ -11,7 +12,7 @@ function hasPngStructure(file) {
     && bytes.toString('ascii', bytes.length - 8, bytes.length - 4) === 'IEND';
 }
 
-function scanMarkdownImages(line, lineNumber, definitions, checkImage, issues) {
+function scanMarkdownImages(line, lineNumber, definitions, checkImage, issues, publicIntent) {
   let cursor = 0;
   while ((cursor = line.indexOf('![', cursor)) >= 0) {
     if (cursor > 0 && line[cursor - 1] === '\\') { cursor += 2; continue; }
@@ -21,6 +22,7 @@ function scanMarkdownImages(line, lineNumber, definitions, checkImage, issues) {
       break;
     }
     const alt = line.slice(cursor + 2, altEnd);
+    if (publicIntent && !alt.trim()) issues.push({ code: 'missing-image-alt', line: lineNumber, detail: line.trim() });
     const next = line[altEnd + 1];
     if (next === '(') {
       let depth = 1;
@@ -84,12 +86,17 @@ function fencedCodeLines(lines) {
   return skipped;
 }
 
-function checkArticle({ file } = {}) {
+function checkArticle({ file, intent = 'reviewable_article', project } = {}) {
   if (!file) throw new Error('--file is required');
+  if (!['internal_note', 'reviewable_article', 'public_article', 'channel_publish'].includes(intent)) throw new Error(`Unknown output intent: ${intent}`);
+  const publicIntent = intent !== 'internal_note';
   const absolute = fs.realpathSync(file);
   const root = path.dirname(absolute);
   const content = fs.readFileSync(absolute, 'utf8');
   const issues = [];
+  if (['public_article', 'channel_publish'].includes(intent) && !project) {
+    issues.push({ code: 'missing-project-state', detail: '--project is required to verify public readiness' });
+  }
   const lines = content.split(/\r?\n/);
   const codeLines = fencedCodeLines(lines);
   const imageDefinitions = new Map();
@@ -122,25 +129,77 @@ function checkArticle({ file } = {}) {
     if (codeLines.has(index)) continue;
     if (/\b(?:TODO|TBD)\b/i.test(line)) issues.push({ code: 'unfinished-text', line: index + 1, detail: line.trim() });
     const withoutWebUrls = line.replace(/https?:\/\/[^\s)<>]+/gi, '').replace(/<\/[A-Za-z][^>]*>/g, '');
-    if (/(?:^|[^\w./:-])\/(?!\/)[^\s<>)]+|[A-Za-z]:\\|file:\/\//i.test(withoutWebUrls)) issues.push({ code: 'absolute-path', line: index + 1, detail: line.trim() });
-    scanMarkdownImages(line, index + 1, imageDefinitions, checkImage, issues);
+    if (publicIntent && /(?:^|[^\w./:-])\/(?!\/)[^\s<>)]+|[A-Za-z]:\\|file:\/\//i.test(withoutWebUrls)) issues.push({ code: 'absolute-path', line: index + 1, detail: line.trim() });
+    if (publicIntent) {
+      if (/\[\[[^\]]+\]\]/.test(line)) issues.push({ code: 'unresolved-wikilink', line: index + 1, detail: line.trim() });
+      if (/(?:^|[\s(<\["'])\.?\/?(?:00-system|10-raw|20-wiki|\.ocf|workspace|notes|artifacts)\//i.test(line) || /source[ -]fingerprint/i.test(line)) {
+        issues.push({ code: 'internal-reference', line: index + 1, detail: line.trim() });
+      }
+      if (/<https?:\/\/[^>]+>/i.test(line)) issues.push({ code: 'bare-angle-url', line: index + 1, detail: line.trim() });
+    }
+    scanMarkdownImages(line, index + 1, imageDefinitions, checkImage, issues, publicIntent);
     for (const match of line.matchAll(/<img\b[^>]*>/gi)) {
       const source = match[0].match(/\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
       if (!source || !(source[1] || source[2] || source[3])) {
         issues.push({ code: 'invalid-image-syntax', line: index + 1, detail: match[0] });
       } else {
         checkImage(source[1] || source[2] || source[3], index + 1);
+        if (publicIntent && !/\balt\s*=\s*(?:"[^"]+"|'[^']+'|[^\s>]+)/i.test(match[0])) {
+          issues.push({ code: 'missing-image-alt', line: index + 1, detail: match[0] });
+        }
       }
     }
   }
-  return { file: absolute, ok: issues.length === 0, issues };
+  if (project) {
+    const projectState = readProjectState(project);
+    const projectRoot = path.dirname(projectState.file);
+    const state = projectState.fields;
+    const expectedArticle = path.join(projectRoot, 'article.md');
+    if (!fs.existsSync(expectedArticle) || absolute !== fs.realpathSync(expectedArticle)) {
+      issues.push({ code: 'article-project-mismatch', detail: 'checked file differs from project article.md' });
+    }
+    if (state.output_intent && state.output_intent !== intent) issues.push({ code: 'intent-mismatch', detail: `${state.output_intent} != ${intent}` });
+    if (['public_article', 'channel_publish'].includes(intent) && state.public_source_status !== 'ready') {
+      issues.push({ code: 'public-source-not-ready', detail: state.public_source_status || 'missing' });
+    }
+    if (['public_article', 'channel_publish'].includes(intent) && state.public_source_status === 'ready'
+      && !fs.existsSync(path.join(projectRoot, 'notes/public-source-map.md'))) {
+      issues.push({ code: 'missing-source-map', detail: 'notes/public-source-map.md' });
+    }
+    if (state.public_readiness_status !== deriveReadiness(state)) {
+      issues.push({ code: 'readiness-mismatch', detail: `${state.public_readiness_status || 'missing'} != ${deriveReadiness(state)}` });
+    }
+    const digest = fs.existsSync(expectedArticle) ? articleDigest(project) : null;
+    if (state.render_status === 'passed' && state.rendered_article_sha256 !== digest) {
+      issues.push({ code: 'stale-check', detail: 'rendered_article_sha256 does not match article.md' });
+    }
+    if (state.editorial_status === 'passed' && state.reviewed_article_sha256 !== digest) {
+      issues.push({ code: 'stale-check', detail: 'reviewed_article_sha256 does not match article.md' });
+    }
+    if (state.render_status === 'passed' && !fs.existsSync(path.join(projectRoot, 'review/render-check.md'))) {
+      issues.push({ code: 'missing-review-record', detail: 'review/render-check.md' });
+    }
+    if (state.editorial_status === 'passed' && !fs.existsSync(path.join(projectRoot, 'review/editorial-review.md'))) {
+      issues.push({ code: 'missing-review-record', detail: 'review/editorial-review.md' });
+    }
+    if (state.visual_status === 'not-needed' && /!\[[^\]]*\]\s*(?:\(|\[)|<img\b/i.test(lines.filter((_, i) => !codeLines.has(i)).join('\n'))) {
+      issues.push({ code: 'visual-status-mismatch', detail: 'article has images while visual_status is not-needed' });
+    }
+  }
+  const counts = { P0: 0, P1: 0, P2: 0, INFO: 0 };
+  for (const issue of issues) {
+    issue.severity = issue.code === 'missing-image-alt' ? 'P1' : 'P0';
+    counts[issue.severity]++;
+  }
+  return { file: absolute, intent, ok: counts.P0 === 0, counts, issues };
 }
 
 if (require.main === module) {
   try {
     const index = process.argv.indexOf('--file');
-    if (index < 0 || !process.argv[index + 1]) throw new Error('Usage: node scripts/check-article.js --file <article.md> [--json]');
-    const report = checkArticle({ file: process.argv[index + 1] });
+    if (index < 0 || !process.argv[index + 1]) throw new Error('Usage: node scripts/check-article.js --file <article.md> [--intent <intent>] [--project <dir>] [--json]');
+    const option = (flag) => { const i = process.argv.indexOf(flag); return i < 0 ? undefined : process.argv[i + 1]; };
+    const report = checkArticle({ file: process.argv[index + 1], intent: option('--intent'), project: option('--project') });
     process.stdout.write(`${JSON.stringify(report, null, process.argv.includes('--json') ? 0 : 2)}\n`);
     if (!report.ok) process.exitCode = 1;
   } catch (error) {
